@@ -233,6 +233,9 @@ body.season-winter .tower-sky-backdrop { background: var(--sky-winter); }
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .tower3d-canvas {
@@ -240,6 +243,9 @@ body.season-winter .tower-sky-backdrop { background: var(--sky-winter); }
   width: 100% !important;
   height: 100% !important;
   outline: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ビル下部階層凡例バー */

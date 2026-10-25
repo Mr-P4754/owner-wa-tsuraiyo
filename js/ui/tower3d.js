@@ -32,15 +32,22 @@ let dirLight = null;
 let hemiLight = null;
 
 /** カメラオービット制御用パラメーター */
-let cameraAngleY = 0.52; // 水平回転角（ラジアン）
+let baseCameraAngleY = 0.52; // プレイヤー操作基準の水平回転角（ラジアン）
+let cameraAngleY = 0.52; // 描画用の水平回転角（ラジアン）
 let cameraElevation = 11.5; // カメラ高さ
-let cameraDistance = 24.5; // カメラ距離
+let cameraDistance = 24.5; // カメラ距離（ズーム）
 const cameraTarget = new THREE.Vector3(0, 8.2, 0);
 
-/** ポインター操作状態 */
+/** ポインター・マルチタッチ（ピンチイン・ピンチアウト）操作状態 */
 let isDragging = false;
 let pointerDownPos = { x: 0, y: 0 };
 let prevPointerPos = { x: 0, y: 0 };
+let maxMoveDistance = 0;
+let wasMultiTouch = false;
+let lastPinchDistance = null;
+let lastPinchMidY = null;
+let lastGestureEndTime = 0;
+const activePointers = new Map(); // pointerId -> { x, y }
 let hoveredFloorNumber = null;
 let currentSeasonIndex = -1;
 
@@ -448,6 +455,15 @@ function buildTowerModel() {
     labelEl.className = 'tower3d-floor-label';
     labelEl.addEventListener('click', (e) => {
       e.stopPropagation();
+      // ピンチ操作中・ドラッグ操作直後の誤タップ発火を防止
+      if (
+        wasMultiTouch ||
+        activePointers.size >= 2 ||
+        maxMoveDistance >= 8 ||
+        performance.now() - lastGestureEndTime < 280
+      ) {
+        return;
+      }
       const currentState = getState();
       const targetFloor = currentState.floors.find((f) => f.floorNumber === floorNum);
       if (targetFloor && onStateChangedCallback) {
@@ -720,30 +736,94 @@ function updateCameraPosition() {
 }
 
 /**
- * マウス・タッチ操作（回転ドラッグ・フロアタップRaycaster）を登録する
+ * マウス・タッチ操作（回転ドラッグ・2本指ピンチイン/ピンチアウト・フロアタップRaycaster）を登録する
  * @param {HTMLCanvasElement} canvas 3Dキャンバス要素
  */
 function bindInteractionEvents(canvas) {
-  canvas.addEventListener('pointerdown', (e) => {
-    isDragging = true;
-    pointerDownPos = { x: e.clientX, y: e.clientY };
-    prevPointerPos = { x: e.clientX, y: e.clientY };
-  });
+  const targetSurface = containerEl || canvas;
 
-  window.addEventListener('pointermove', (e) => {
-    if (isDragging) {
-      const dx = e.clientX - prevPointerPos.x;
-      const dy = e.clientY - prevPointerPos.y;
-      prevPointerPos = { x: e.clientX, y: e.clientY };
+  // スマホブラウザのネイティブピンチズーム・スクロール干渉を抑止
+  targetSurface.addEventListener(
+    'touchmove',
+    (e) => {
+      if (e.cancelable) e.preventDefault();
+    },
+    { passive: false }
+  );
+  targetSurface.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+  targetSurface.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
 
-      cameraAngleY -= dx * 0.008;
-      cameraElevation = Math.max(3.5, Math.min(22.0, cameraElevation + dy * 0.04));
-      updateCameraPosition();
+  targetSurface.addEventListener('pointerdown', (e) => {
+    if (e.target && e.target.closest && e.target.closest('.tower3d-emergency-btn')) {
       return;
     }
 
-    // ホバー時のフロアハイライト判定
-    if (!containerEl || !renderer) return;
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activePointers.size === 1) {
+      isDragging = true;
+      wasMultiTouch = false;
+      maxMoveDistance = 0;
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+      prevPointerPos = { x: e.clientX, y: e.clientY };
+      lastPinchDistance = null;
+      lastPinchMidY = null;
+    } else if (activePointers.size >= 2) {
+      isDragging = true;
+      wasMultiTouch = true;
+      const pts = Array.from(activePointers.values());
+      lastPinchDistance = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      lastPinchMidY = (pts[0].y + pts[1].y) * 0.5;
+    }
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (activePointers.has(e.pointerId)) {
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // 2本指でのピンチイン・ピンチアウト（ズーム＆上下視点移動）
+      if (activePointers.size >= 2) {
+        wasMultiTouch = true;
+        const pts = Array.from(activePointers.values());
+        const currentDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        const currentMidY = (pts[0].y + pts[1].y) * 0.5;
+
+        if (lastPinchDistance !== null && currentDist > 8 && lastPinchDistance > 8) {
+          const zoomScale = lastPinchDistance / currentDist;
+          cameraDistance = Math.max(13.5, Math.min(36.0, cameraDistance * zoomScale));
+        }
+        if (lastPinchMidY !== null) {
+          const dyMid = currentMidY - lastPinchMidY;
+          cameraElevation = Math.max(3.5, Math.min(22.0, cameraElevation + dyMid * 0.035));
+        }
+
+        lastPinchDistance = currentDist;
+        lastPinchMidY = currentMidY;
+        updateCameraPosition();
+        return;
+      }
+
+      // 1本指またはマウスでの回転ドラッグ（マルチタッチ直後の残り1本指による座標ジャンプを防止）
+      if (isDragging && activePointers.size === 1 && !wasMultiTouch) {
+        const dx = e.clientX - prevPointerPos.x;
+        const dy = e.clientY - prevPointerPos.y;
+        prevPointerPos = { x: e.clientX, y: e.clientY };
+
+        const totalDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+        if (totalDist > maxMoveDistance) {
+          maxMoveDistance = totalDist;
+        }
+
+        baseCameraAngleY -= dx * 0.008;
+        cameraElevation = Math.max(3.5, Math.min(22.0, cameraElevation + dy * 0.04));
+        updateCameraPosition();
+        return;
+      }
+      return;
+    }
+
+    // 非ドラッグ時のホバーによるフロアハイライト判定（PCマウス用）
+    if (isDragging || !containerEl || !renderer) return;
     const rect = canvas.getBoundingClientRect();
     if (
       e.clientX < rect.left ||
@@ -770,42 +850,69 @@ function bindInteractionEvents(canvas) {
     }
   });
 
-  window.addEventListener('pointerup', (e) => {
-    if (!isDragging) return;
-    isDragging = false;
+  const handlePointerEnd = (e) => {
+    if (!activePointers.has(e.pointerId)) return;
+    activePointers.delete(e.pointerId);
 
-    // 移動距離が小さい場合はクリック（タップ）とみなしてRaycasterを実行
-    const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
-    if (moveDist < 6 && renderer) {
-      const rect = canvas.getBoundingClientRect();
-      if (
-        e.clientX >= rect.left &&
-        e.clientX <= rect.right &&
-        e.clientY >= rect.top &&
-        e.clientY <= rect.bottom
+    if (activePointers.size < 2) {
+      lastPinchDistance = null;
+      lastPinchMidY = null;
+    }
+
+    // 2本指から1本指になった瞬間は残り指の現在座標に同期して視点ジャンプを防ぐ
+    if (activePointers.size === 1) {
+      const remaining = activePointers.values().next().value;
+      if (remaining) {
+        prevPointerPos = { x: remaining.x, y: remaining.y };
+      }
+      return;
+    }
+
+    if (activePointers.size === 0) {
+      const wasPinchOrDrag = wasMultiTouch || maxMoveDistance >= 8;
+      if (wasPinchOrDrag) {
+        lastGestureEndTime = performance.now();
+      } else if (
+        renderer &&
+        !(e.target && e.target.closest && e.target.closest('.tower3d-floor-label'))
       ) {
-        pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-        raycaster.setFromCamera(pointerNDC, camera);
-        const hits = raycaster.intersectObjects(floorMeshes, false);
-        if (hits.length > 0) {
-          const floorNum = hits[0].object.userData.floorNumber;
-          const state = getState();
-          const targetFloor = state.floors.find((f) => f.floorNumber === floorNum);
-          if (targetFloor && onStateChangedCallback) {
-            showFloorDetailModal(targetFloor, onStateChangedCallback);
+        // 1本指で移動距離が小さい場合はフロアタップとみなしてRaycasterを実行
+        const rect = canvas.getBoundingClientRect();
+        if (
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom
+        ) {
+          pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(pointerNDC, camera);
+          const hits = raycaster.intersectObjects(floorMeshes, false);
+          if (hits.length > 0) {
+            const floorNum = hits[0].object.userData.floorNumber;
+            const state = getState();
+            const targetFloor = state.floors.find((f) => f.floorNumber === floorNum);
+            if (targetFloor && onStateChangedCallback) {
+              showFloorDetailModal(targetFloor, onStateChangedCallback);
+            }
           }
         }
       }
-    }
-  });
 
-  // ホイールによるズーム操作
-  canvas.addEventListener(
+      isDragging = false;
+      wasMultiTouch = false;
+    }
+  };
+
+  window.addEventListener('pointerup', handlePointerEnd);
+  window.addEventListener('pointercancel', handlePointerEnd);
+
+  // PCホイール・トラックパッドによるズーム操作
+  targetSurface.addEventListener(
     'wheel',
     (e) => {
       e.preventDefault();
-      cameraDistance = Math.max(15.5, Math.min(34.0, cameraDistance + e.deltaY * 0.012));
+      cameraDistance = Math.max(13.5, Math.min(36.0, cameraDistance + e.deltaY * 0.012));
       updateCameraPosition();
     },
     { passive: false }
@@ -920,11 +1027,9 @@ function animateLoop(timestamp) {
     posAttr.needsUpdate = true;
   }
 
-  // 4. ドラッグ中でないときはビルがごく緩やかに呼吸するように微回転
-  if (!isDragging) {
-    cameraAngleY = 0.52 + Math.sin(t * 0.35) * 0.14;
-    updateCameraPosition();
-  }
+  // 4. プレイヤーが回転させた基準角度（baseCameraAngleY）を維持しつつ、ごく緩やかに呼吸運動させる
+  cameraAngleY = baseCameraAngleY + Math.sin(t * 0.35) * 0.08;
+  updateCameraPosition();
 
   updateFloatingLabelsPosition();
   renderer.render(scene, camera);
