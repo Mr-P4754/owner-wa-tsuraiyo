@@ -1,0 +1,196 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>オーナーはつらいよ - ビル経営シミュレーション</title>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        if (registrations.length > 0) {
+          Promise.all(registrations.map(function (reg) { return reg.unregister(); })).then(function () {
+            window.location.reload();
+          });
+        }
+      });
+    }
+  </script>
+  <link rel="stylesheet" href="./css/reset.css">
+  <link rel="stylesheet" href="./css/layout.css">
+  <link rel="stylesheet" href="./css/components.css">
+</head>
+<body class="season-spring">
+  <div class="app-container">
+    <!-- ヘッダー領域：シンプルHUDバー -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-logo" aria-hidden="true">🏢</div>
+        <div class="brand-text-wrap">
+          <h1 class="brand-title">オーナーはつらいよ</h1>
+        </div>
+        <div class="header-utility-btns">
+          <button id="btn-help" class="btn-icon-chip" title="ルール確認">
+            <span>❓</span><span class="chip-label">ルール</span>
+          </button>
+          <button id="btn-reset" class="btn-icon-chip chip-danger" title="リセット">
+            <span>🔄</span><span class="chip-label">リセット</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="header-hud">
+        <!-- 季節・ターン -->
+        <div class="hud-card hud-time">
+          <div class="hud-icon" id="header-season-icon">🌸</div>
+          <div class="hud-content">
+            <span class="hud-label">期間</span>
+            <div class="hud-val-row">
+              <span id="header-year-season" class="hud-value">1年目・春</span>
+              <span id="header-turn-count" class="hud-sub">1/60</span>
+            </div>
+            <div class="hud-bar"><div id="header-turn-bar" class="hud-bar-fill fill-time" style="width: 2%;"></div></div>
+          </div>
+        </div>
+
+        <!-- 手元資金 -->
+        <div class="hud-card hud-funds">
+          <div class="hud-icon">💰</div>
+          <div class="hud-content">
+            <span class="hud-label">手元資金</span>
+            <div class="hud-val-row">
+              <span id="header-funds" class="hud-value">1,500万</span>
+              <span id="header-expected-net" class="hud-sub">-200万</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 修繕積立金 -->
+        <div class="hud-card hud-reserve">
+          <div class="hud-icon">🛠️</div>
+          <div class="hud-content">
+            <span class="hud-label">修繕積立</span>
+            <div class="hud-val-row">
+              <span id="header-reserve" class="hud-value">0万</span>
+              <span id="header-next-repair" class="hud-sub">残19T</span>
+            </div>
+            <div class="hud-bar"><div id="header-reserve-bar" class="hud-bar-fill fill-reserve" style="width: 0%;"></div></div>
+          </div>
+        </div>
+
+        <!-- ビルの評判 -->
+        <div class="hud-card hud-reputation">
+          <div class="hud-icon">⭐</div>
+          <div class="hud-content">
+            <span class="hud-label">評判</span>
+            <div class="hud-val-row">
+              <span id="header-reputation" class="hud-value">50</span>
+              <span id="header-reputation-rank" class="hud-sub">標準</span>
+            </div>
+            <div class="hud-bar"><div id="header-reputation-bar" class="hud-bar-fill fill-rep" style="width: 50%;"></div></div>
+          </div>
+        </div>
+
+        <!-- 入居率・信頼度 -->
+        <div class="hud-card hud-trust">
+          <div class="hud-icon">🤝</div>
+          <div class="hud-content">
+            <span class="hud-label">信頼 / 入居</span>
+            <div class="hud-val-row">
+              <span id="header-trust" class="hud-value">--</span>
+              <span id="header-occupancy-sub" class="hud-sub">0/10</span>
+            </div>
+            <div class="hud-bar"><div id="header-trust-bar" class="hud-bar-fill fill-trust" style="width: 0%;"></div></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- メインコンテンツ：ノンスクロール2カラム（モバイルはタブ切替） -->
+    <main class="app-main" id="app-main-view" data-mobile-view="building">
+      <!-- 左カラム：10階建てビル断面タワービュー（タップで詳細確認） -->
+      <section class="column-building" aria-label="ビル断面タワービュー">
+        <div class="tower-sky-backdrop" id="tower-sky-backdrop">
+          <!-- ビル屋上ヘッダー -->
+          <div class="tower-roof">
+            <div class="roof-decor">
+              <span class="roof-billboard">🏢 3Dビル</span>
+              <span id="building-event-badge" class="roof-event-badge hidden">🔔 0</span>
+            </div>
+            <span class="ground-hint">🔄ドラッグ回転 ／ 👆部屋タップ</span>
+          </div>
+
+          <!-- 10階〜1階の均等10分割フロア断面コンテナ（スクロールなし） -->
+          <div id="floor-list-container" class="tower-floors-grid">
+            <!-- JavaScriptで10F〜1Fを描画 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 右カラム：経営アクションパネル -->
+      <section class="column-actions" aria-label="経営アクションパネル">
+        <nav class="tab-nav" role="tablist">
+          <!-- ビル断面タブ（退去・家賃交渉のバッジ表示対応） -->
+          <button class="tab-btn mobile-only-tab" data-tab="building" role="tab" aria-selected="false">
+            <span class="tab-icon">🏢</span>
+            <span class="tab-text">ビル断面</span>
+            <span id="badge-building" class="tab-badge badge-neutral hidden">0</span>
+          </button>
+
+          <button class="tab-btn active" data-tab="screening" role="tab" aria-selected="true">
+            <span class="tab-icon">📋</span>
+            <span class="tab-text">審査</span>
+            <span id="badge-screening" class="tab-badge">0</span>
+          </button>
+
+          <button class="tab-btn" data-tab="trouble" role="tab" aria-selected="false">
+            <span class="tab-icon">⚡</span>
+            <span class="tab-text">トラブル</span>
+            <span id="badge-trouble" class="tab-badge badge-alert hidden">0</span>
+          </button>
+
+          <button class="tab-btn" data-tab="finance" role="tab" aria-selected="false">
+            <span class="tab-icon">🏦</span>
+            <span class="tab-text">財務</span>
+          </button>
+
+          <button class="tab-btn" data-tab="log" role="tab" aria-selected="false">
+            <span class="tab-icon">📖</span>
+            <span class="tab-text">ログ</span>
+            <span id="badge-log" class="tab-badge badge-neutral hidden">!</span>
+          </button>
+        </nav>
+
+        <div id="tab-content-container" class="tab-content">
+          <!-- JavaScriptでアクティブなタブ内容をシンプル描画 -->
+        </div>
+      </section>
+    </main>
+
+    <!-- フッター領域：秘書ナビ＆ターン進行ボタン -->
+    <footer class="app-footer">
+      <div class="footer-advisor">
+        <div class="advisor-avatar" aria-hidden="true">👩‍💼</div>
+        <div id="footer-status-msg" class="footer-status">
+          カードをタップして詳細を確認しましょう。
+        </div>
+      </div>
+      <div class="footer-actions">
+        <button id="btn-next-turn" class="btn btn-next-season">
+          <span>次の季節へ</span>
+          <span class="next-arrow">▶</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- モーダル領域 -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div id="modal-container" class="modal-box">
+      <!-- JavaScriptでモーダル内容を描画 -->
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+﻿/* ==========================================================================
+   reset.css - リセット・ゲームテーマ変数・ノンスクロール基盤設定
+   ========================================================================== */
+
+:root {
+  /* ゲームベースカラー */
+  --bg-deep: #0b1120;
+  --bg-panel: #152238;
+  --bg-panel-inner: #1c2d4a;
+  --bg-card: #213555;
+  --bg-card-light: #2a4365;
+
+  /* ビル外観・部屋カラー */
+  --building-frame: #334155;
+  --building-pillar: #475569;
+  --room-vacant-bg: #111827;
+  --room-low-lit: linear-gradient(90deg, #1e3a2f 0%, #2b5340 50%, #1e3a2f 100%);
+  --room-mid-lit: linear-gradient(90deg, #1e3a5f 0%, #2a528a 50%, #1e3a5f 100%);
+  --room-high-lit: linear-gradient(90deg, #3b1d5e 0%, #582c8b 50%, #3b1d5e 100%);
+  --room-bad-lit: linear-gradient(90deg, #451a2b 0%, #6b2137 50%, #451a2b 100%);
+
+  /* テキストカラー */
+  --text-main: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+
+  /* ゲームアクセントカラー */
+  --color-primary: #3b82f6;
+  --color-primary-dark: #1d4ed8;
+  --color-gold: #fbbf24;
+  --color-gold-dark: #d97706;
+  --color-emerald: #10b981;
+  --color-emerald-dark: #047857;
+  --color-rose: #f43f5e;
+  --color-rose-dark: #be123c;
+  --color-purple: #a855f7;
+  --color-cyan: #06b6d4;
+
+  /* 季節ごとの空背景グラデーション */
+  --sky-spring: linear-gradient(180deg, #38bdf8 0%, #bae6fd 55%, #fbcfe8 100%);
+  --sky-summer: linear-gradient(180deg, #0284c7 0%, #38bdf8 60%, #e0f2fe 100%);
+  --sky-autumn: linear-gradient(180deg, #c2410c 0%, #f97316 55%, #fde047 100%);
+  --sky-winter: linear-gradient(180deg, #1e1b4b 0%, #312e81 55%, #93c5fd 100%);
+
+  /* ボーダー・シャドウ */
+  --border-color: #334e68;
+  --border-bright: #486581;
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.75);
+
+  /* 角丸・フォント */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --font-sans: "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", "Meiryo", system-ui, -apple-system, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden !important; /* 画面全体のスクロールを完全禁止 */
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text-main);
+  background-color: var(--bg-deep);
+  -webkit-font-smoothing: antialiased;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.text-positive {
+  color: #34d399 !important;
+}
+
+.text-negative {
+  color: #fb7185 !important;
+}
+
+.text-warning {
+  color: #fbbf24 !important;
+}
