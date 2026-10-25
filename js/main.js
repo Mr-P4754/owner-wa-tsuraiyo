@@ -16,8 +16,8 @@ import {
   renderHeader,
   renderBuildingList,
   renderBadgesAndFooter,
-} from './ui/renderDashboard.js';
-import { renderActiveTab } from './ui/renderTabs.js';
+} from './ui/renderDashboard.js?v=20261026b';
+import { renderActiveTab } from './ui/renderTabs.js?v=20261026b';
 import {
   showMajorRepairModal,
   showGameOverModal,
@@ -25,15 +25,15 @@ import {
   showHelpModal,
   showCustomModal,
   closeModal,
-} from './ui/modal.js';
+} from './ui/modal.js?v=20261026b';
 
 /**
  * ダッシュボード全体のUIを再描画する
  */
 export function refreshAllUI() {
   renderHeader();
-  renderBuildingList(refreshAllUI);
   renderActiveTab(refreshAllUI);
+  renderBuildingList(refreshAllUI);
   renderBadgesAndFooter();
 }
 

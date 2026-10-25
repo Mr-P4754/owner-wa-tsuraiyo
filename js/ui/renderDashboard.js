@@ -13,7 +13,7 @@ import {
   calculateExpectedTurnCashflow,
 } from '../state.js';
 import { getNextRepairScheduleInfo, calculateRepairBreakdown } from '../logic/repairLogic.js';
-import { initTower3D, updateTower3DFromState, handleResize } from './tower3d.js';
+import { initTower3D, updateTower3DFromState, handleResize } from './tower3d.js?v=20261026b';
 
 /**
  * 入居者または応募者のプロフィールからキャラクターアバター絵文字を決定する
